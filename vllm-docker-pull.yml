@@ -13,3 +13,9 @@
       community.docker.docker_image:
         name: "ghcr.io/open-webui/open-webui:main"
         source: pull
+        
+    - name: Add remote user to the docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}" # This automatically targets the user you SSH'd with
+        groups: docker
+        append: yes # This is crucial to add the group, not replace all other groups
