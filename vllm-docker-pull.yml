@@ -1,0 +1,15 @@
+---
+- name: Pull Application-Specific Docker Images
+  hosts: all
+  become: true # Required to interact with the system's Docker daemon
+
+  tasks:
+    - name: Pull the vLLM Docker image from Docker Hub
+      community.docker.docker_image:
+        name: "vllm/vllm-openai:latest"
+        source: pull
+
+    - name: Pull the Open WebUI Docker image from GitHub Container Registry
+      community.docker.docker_image:
+        name: "ghcr.io/open-webui/open-webui:main"
+        source: pull
