@@ -1,6 +1,6 @@
 ---
 - name: Setup vLLM and Open WebUI Docker Environment
-  hosts: all
+  hosts: localhost
   become: true
   gather_facts: true
 
