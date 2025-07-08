@@ -3,7 +3,6 @@
   hosts: localhost
   become: true
   gather_facts: true
-
   tasks:
     - name: Install Docker Python module (if not present)
       pip:
@@ -16,9 +15,9 @@
         state: started
         enabled: true
 
-    - name: Add remote user to the docker group
+    - name: Add current user to the docker group
       user:
-        name: "{{ ansible_user }}"
+        name: "leckhoff"
         groups: docker
         append: yes
       register: user_group_change
@@ -29,10 +28,15 @@
 
     - name: Wait for Docker daemon to be ready
       wait_for:
-        port: 2375
-        host: localhost
+        path: /var/run/docker.sock
+        state: present
         timeout: 30
-      ignore_errors: true
+
+    - name: Set proper permissions on Docker socket
+      file:
+        path: /var/run/docker.sock
+        mode: '0666'
+      when: user_group_change.changed
 
     - name: Test Docker access without sudo
       command: docker info
@@ -41,12 +45,14 @@
       retries: 3
       delay: 5
       until: docker_test.rc == 0
+      environment:
+        USER: "leckhoff"
 
     - name: Pull the vLLM Docker image from Docker Hub
       docker_image:
         name: "vllm/vllm-openai:latest"
         source: pull
-        timeout: 300
+        timeout: 600  # Increased timeout for large image
       become: false
       retries: 2
       delay: 10
@@ -55,7 +61,7 @@
       docker_image:
         name: "ghcr.io/open-webui/open-webui:main"
         source: pull
-        timeout: 300
+        timeout: 600  # Increased timeout
       become: false
       retries: 2
       delay: 10
