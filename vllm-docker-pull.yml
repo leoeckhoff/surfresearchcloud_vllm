@@ -1,21 +1,70 @@
 ---
-- name: Pull Application-Specific Docker Images
+- name: Setup vLLM and Open WebUI Docker Environment
   hosts: all
-  become: true # Required to interact with the system's Docker daemon
+  become: true
+  gather_facts: true
 
   tasks:
+    - name: Install Docker Python module (if not present)
+      pip:
+        name: docker
+        state: present
+
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add remote user to the docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+      register: user_group_change
+
+    - name: Reset ssh connection to allow user group changes to take effect
+      meta: reset_connection
+      when: user_group_change.changed
+
+    - name: Wait for Docker daemon to be ready
+      wait_for:
+        port: 2375
+        host: localhost
+        timeout: 30
+      ignore_errors: true
+
+    - name: Test Docker access without sudo
+      command: docker info
+      become: false
+      register: docker_test
+      retries: 3
+      delay: 5
+      until: docker_test.rc == 0
+
     - name: Pull the vLLM Docker image from Docker Hub
-      community.docker.docker_image:
+      docker_image:
         name: "vllm/vllm-openai:latest"
         source: pull
+        timeout: 300
+      become: false
+      retries: 2
+      delay: 10
 
     - name: Pull the Open WebUI Docker image from GitHub Container Registry
-      community.docker.docker_image:
+      docker_image:
         name: "ghcr.io/open-webui/open-webui:main"
         source: pull
-        
-    - name: Add remote user to the docker group
-      ansible.builtin.user:
-        name: "{{ ansible_user }}" # This automatically targets the user you SSH'd with
-        groups: docker
-        append: yes # This is crucial to add the group, not replace all other groups
+        timeout: 300
+      become: false
+      retries: 2
+      delay: 10
+
+    - name: Verify images were pulled successfully
+      command: docker images
+      become: false
+      register: docker_images_output
+
+    - name: Display pulled images
+      debug:
+        msg: "{{ docker_images_output.stdout_lines }}"
